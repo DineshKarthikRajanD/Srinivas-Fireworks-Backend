@@ -1,13 +1,32 @@
+// salesReportController.js
+
 const Order = require("../../models/OrderModel");
 const Payment = require("../../models/PaymentModel");
 const Cracker = require("../../models/CrackerModel");
 
-const normalizeName = (name) => name.trim().toLowerCase();
+// Helper function to normalize cracker names (example: lowercase & trim)
+function normalizeName(name) {
+  return name.trim().toLowerCase();
+}
 
 const getSalesReport = async (req, res) => {
   try {
+    const { month } = req.query;
+
+    let orderFilter = {};
+    if (month) {
+      const startDate = new Date(`${month}-01T00:00:00.000Z`);
+      const nextMonth = new Date(startDate);
+      nextMonth.setMonth(startDate.getMonth() + 1);
+
+      orderFilter.createdAt = {
+        $gte: startDate,
+        $lt: nextMonth,
+      };
+    }
+
     const [orders, payments, crackers] = await Promise.all([
-      Order.find(),
+      Order.find(orderFilter),
       Payment.find(),
       Cracker.find(),
     ]);
@@ -21,12 +40,10 @@ const getSalesReport = async (req, res) => {
       payments.map((p) => p.orderId?.toString()).filter(Boolean)
     );
 
-    // Initialize sales tracking
     const crackerSales = {};
     let totalRevenue = 0;
     let totalUnitsSold = 0;
 
-    // Loop through each order and accumulate sales data
     for (const order of orders) {
       if (!order._id || !paidOrderIds.has(order._id.toString())) continue;
 
@@ -62,7 +79,6 @@ const getSalesReport = async (req, res) => {
       }
     }
 
-    // Sort crackers by total units sold
     const salesByCracker = Object.values(crackerSales).sort(
       (a, b) => b.totalSold - a.totalSold
     );
@@ -81,6 +97,4 @@ const getSalesReport = async (req, res) => {
   }
 };
 
-module.exports = {
-  getSalesReport,
-};
+module.exports = { getSalesReport };
